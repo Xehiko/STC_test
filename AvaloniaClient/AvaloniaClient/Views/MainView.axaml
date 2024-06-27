@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:AvaloniaClient.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="AvaloniaClient.Views.MainView"
+             x:DataType="vm:MainViewModel">
+  <Design.DataContext>
+    <!-- This only sets the DataContext for the previewer in an IDE,
+         to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
+    <vm:MainViewModel />
+  </Design.DataContext>
+  <Grid ColumnDefinitions="*,*,*" Background="AliceBlue" TextElement.Foreground="Black">
+
+    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+      <TextBlock HorizontalAlignment="Center" Margin="0, 0, 0, 5">Статус подключения</TextBlock>
+      <TextBox x:Name="ConnectionStatusTextbox" Text="{Binding Connection.ConnectionStatus}" Height="40" Width="300" IsReadOnly="True"></TextBox>
+      <Button Content="Установить соединение" Command="{Binding InitiateConnectionCommand}" Height="40" Width="300" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Foreground="Black" Margin="0, 20, 0, 0">
+        <Button.Styles>
+          <Style Selector="Button">
+            <Setter Property="Background" Value="LightBlue"></Setter>
+          </Style>
+          <Style Selector="Button:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Aqua"></Setter>
+          </Style>
+          <Style Selector="Button:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="DarkGray"></Setter>
+          </Style>
+          <Style Selector="Button:disabled /template/ ContentPresenter">
+            <Setter Property="Background" Value="DarkGray"></Setter>
+          </Style>
+        </Button.Styles>
+      </Button>
+    </StackPanel>
+
+    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+      <TextBlock HorizontalAlignment="Center" Margin="0, 0, 0, 5">Ввод</TextBlock>
+      <TextBox x:Name="UserInputTextbox" Text="{Binding Connection.UserInput}" Grid.Column="1" Height="40" Width="300"></TextBox>
+      <Button Content="Ввод" Command="{Binding SendDataCommand}" Height="40" Width="300" HorizontalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Foreground="Black" Margin="0, 20, 0, 0">
+        <Button.Styles>
+          <Style Selector="Button">
+            <Setter Property="Background" Value="LightBlue"></Setter>
+          </Style>
+          <Style Selector="Button:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Aqua"></Setter>
+          </Style>
+          <Style Selector="Button:pressed /template/ ContentPresenter">
+            <Setter Property="Background" Value="DarkGray"></Setter>
+          </Style>
+          <Style Selector="Button:disabled /template/ ContentPresenter">
+            <Setter Property="Background" Value="DarkGray"></Setter>
+          </Style>
+        </Button.Styles>
+      </Button>
+    </StackPanel>
+    
+    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+      <TextBlock HorizontalAlignment="Center" Margin="0, 0, 0, 5">Ответ сервера</TextBlock>
+      <TextBox x:Name="ServerResponseTextbox" IsReadOnly="True" Text="{Binding Connection.ServerResponse}" Grid.Column="1" Height="40" Width="300"></TextBox>
+      <TextBlock HorizontalAlignment="Center" Height="60"></TextBlock>
+    </StackPanel>
+   
+  </Grid>
+</UserControl>
