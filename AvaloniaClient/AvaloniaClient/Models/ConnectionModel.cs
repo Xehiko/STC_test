@@ -5,91 +5,103 @@ using System.Text;
 using Avalonia.Threading;
 using System;
 using System.IO;
+using System.Threading;
 
 namespace AvaloniaClient.Models
 {
-    public class ConnectionModel : ObservableObject
+    public class ConnectionModel
     {
-        private TcpClient _client;
         private const string Hostname = "127.0.0.1";
         private const int Port = 8888;
-        private string _connectionStatus;
-        private string _userInput;
-        private string _serverResponse;
+        private const int MaxRetryAttempts = 5;
 
-        public string ConnectionStatus
-        {
-            get => _connectionStatus;
-            set => SetProperty(ref _connectionStatus, value);
-        }
-        public string UserInput
-        {
-            get => _userInput;
-            set => SetProperty(ref _userInput, value);
-        }
-        public string ServerResponse
-        {
-            get => _serverResponse;
-            set => SetProperty(ref _serverResponse, value);
-        }
+        private TcpClient? _client;
+        private int _connectionAttempt;
+
+        public event EventHandler<string>? MessageReceived;
+        public event EventHandler<string>? ConnectionStatusChanged;
+        public event EventHandler<bool>? IsAbleToConnectChanged;
 
         public ConnectionModel()
         {
-            _client = new TcpClient();
-            _connectionStatus = "";
-            _userInput = "";
-            _serverResponse= "";
+            _connectionAttempt = 0;
         }
 
-        public async Task Connect()
+        public async Task ConnectAsync()
         {
-            try
+            // если мы уже подключаемся
+            // вызываем из UI-потока
+            Dispatcher.UIThread.Post(() => IsAbleToConnectChanged?.Invoke(this, false));
+            // если уже подключен
+            if (_client != null && _client.Connected)
+                return;
+            for (_connectionAttempt = 1; _connectionAttempt <= MaxRetryAttempts; _connectionAttempt++)
             {
-                await _client.ConnectAsync(Hostname, Port);
-                Dispatcher.UIThread.Post(() => UpdateConnectionStatus($"Подключен к {Hostname}:{Port}"));
-                _ = Task.Run(ReceiveDataAsync);
-            }
-            catch (IOException IOEx) when (IOEx.InnerException is SocketException)
-            {
-                Dispatcher.UIThread.Post(() => UpdateConnectionStatus("Ошибка подключения"));
+                try
+                {
+                    _client = new TcpClient();
+                    await _client.ConnectAsync(Hostname, Port);
+
+                    // При успешном подклчении сбрасываем попытки переподключений
+                    _connectionAttempt = 0;
+
+                    Dispatcher.UIThread.Post(() => ConnectionStatusChanged?.Invoke(this, $"Подключен к {Hostname}:{Port}"));
+
+                    _ = Task.Run(ReceiveDataAsync);
+                    break;
+                }
+                catch (SocketException)
+                {
+                    // попытка переподкючения каждые 2 секунд
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    Dispatcher.UIThread.Post(() => ConnectionStatusChanged?.Invoke(this, $"Попытка подключения ({_connectionAttempt})..."));
+
+                    if (_connectionAttempt == MaxRetryAttempts)
+                    {
+                        Dispatcher.UIThread.Post(() => ConnectionStatusChanged?.Invoke(this, "Ошибка подключения"));
+                        // выход из функции Connect - значит можем подключаться в UI
+                        Dispatcher.UIThread.Post(() => IsAbleToConnectChanged?.Invoke(this, true));
+                    }
+                }
             }
         }
 
-        public async Task SendDataAsync()
+        public async Task SendDataAsync(string message)
         {
-            if (_client.Connected)
+            // может отправить, только если подключен
+            if (_client!.Connected)
             {
-                await _client.GetStream().WriteAsync(Encoding.UTF8.GetBytes(_userInput));
+                await _client.GetStream().WriteAsync(Encoding.UTF8.GetBytes(message));
             }
         }
 
         private async void ReceiveDataAsync()
         {
-            if (_client.Connected)
+            // если не подключен
+            if (!_client!.Connected)
+                return;
+            try
             {
-                try
+                using NetworkStream networkStream = _client.GetStream();
+
+                byte[] buffer = new byte[1024];
+
+                while (true)
                 {
-                    using NetworkStream networkStream = _client.GetStream();
+                    var messageLength = await networkStream.ReadAsync(buffer);
 
-                    byte[] buffer = new byte[1024];
-
-                    while (true)
-                    {
-                        var messageLength = await networkStream.ReadAsync(buffer);
-
-                        // в UI потоке поменяли ответ сервера
-                        Dispatcher.UIThread.Post(() => UpdateServerResponse(Encoding.UTF8.GetString(buffer, 0, messageLength)));
-                    }
-                }
-                catch (IOException IOEx) when (IOEx.InnerException is SocketException)
-                {
-                    Dispatcher.UIThread.Post(() => UpdateConnectionStatus("Удаленный хост разорвал соединение"));
+                    // в UI потоке поменяли ответ сервера
+                    Dispatcher.UIThread.Post(() => MessageReceived?.Invoke(this, Encoding.UTF8.GetString(buffer, 0, messageLength)));
                 }
             }
+            // сервер разорвал соединение
+            catch (IOException IOEx) when (IOEx.InnerException is SocketException)
+            {
+                Dispatcher.UIThread.Post(() => ConnectionStatusChanged?.Invoke(this, "Сервер разовал соединение."));
+
+                // повторно пытаемся подключиться
+                _ = ConnectAsync();
+            }
         }
-
-        private void UpdateServerResponse(string newResponse) => ServerResponse = newResponse;
-
-        private void UpdateConnectionStatus(string status) => ConnectionStatus = status;
     }
 }

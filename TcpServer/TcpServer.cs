@@ -36,6 +36,9 @@ namespace ServerTcp
                 Thread processDataThread = new Thread(new ThreadStart(ProcessData));
                 processDataThread.Start();
 
+                // Запускаем отправку времени каждые 10 секунд
+                Timer timer = new Timer(SendTimeToClients, null, 0, 10000);
+
                 while (true)
                 {
                     var newClient = _listener.AcceptTcpClient();
@@ -101,6 +104,17 @@ namespace ServerTcp
                     NetworkStream stream = message.Item1.GetStream();
 
                     stream.Write(Encoding.UTF8.GetBytes(message.Item2));
+                }
+            }
+        }
+
+        private void SendTimeToClients(object? o)
+        {
+            lock(_clients)
+            {
+                foreach (var client in _clients)
+                {
+                    client.GetStream().Write(Encoding.UTF8.GetBytes(DateTime.Now.ToString("dd.MM.yyyy HH:mm:ss")));
                 }
             }
         }
